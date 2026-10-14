@@ -67,3 +67,37 @@ It came down to `bigint` or `uuidv7`.
 ### Decision: `bigint`
 
 The requirements have no distributed system overhead and no client-side id generation. The app mostly retrieves logs, and that needs to stay fast at scale.
+
+---
+
+## 3. Foreign keys and ON DELETE
+
+### What a foreign key is
+
+A column (or columns) that points to the primary key of another table. It enforces **referential integrity**: a child row can't reference a parent that doesn't exist.
+
+### ON DELETE: what happens to the child when the parent is deleted?
+
+| Option                | Behavior                                                                                                         | Use when                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `NO ACTION` (default) | Blocks deleting a parent that a child still references.                                                          | The parent must never disappear while children exist.               |
+| `RESTRICT`            | Same block, but checked immediately. `NO ACTION` can be deferred to the end of a transaction, `RESTRICT` cannot. | You want the failure right away.                                    |
+| `CASCADE`             | Deletes all children along with the parent.                                                                      | The child has no meaning without the parent (e.g. `log_tags` rows). |
+| `SET NULL`            | Sets the child's foreign key column to `NULL`.                                                                   | The child must survive without the parent. Needs a nullable column. |
+
+> **Careful with `CASCADE`:** it is clean, but it silently deletes data. Use it only when losing the children is truly fine.
+
+### My case: `projects` and `logs`
+
+- `projects` is the parent. `logs` has a `project_id` column pointing to it.
+- Users never create a project directly. A project is created **indirectly** when a log names one (find-or-create, same pattern as tags).
+- Editing the project name inside a log creates another project internally.
+- So projects can only be created, never deleted. There is no delete-project feature.
+
+That narrows it down to `RESTRICT` vs `SET NULL`. Since the project is **optional** and `project_id` is already nullable, I'm choosing `SET NULL`: if a project row is ever removed (manual cleanup, admin work), the logs survive instead of blocking the delete or vanishing.
+
+```sql
+ALTER TABLE logs
+  ADD COLUMN project_id BIGINT
+  REFERENCES projects(id) ON DELETE SET NULL;
+```
