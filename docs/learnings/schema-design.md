@@ -145,3 +145,57 @@ CREATE TABLE tags (
   UNIQUE (user_id, name)  -- composite
 );
 ```
+
+---
+
+## 5. Data types
+
+### String
+
+| Type         | Notes                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `char(n)`    | Always pads with spaces up to `n` characters. Avoid it.                                                            |
+| `varchar(n)` | Same storage as `text`, plus a length limit. Use it when the limit is a real rule, like a status code or pin code. |
+| `text`       | No performance penalty. Holds dynamic values up to 1 GB.                                                           |
+
+**Prefer `text` in most cases.** If you need a length limit, `text` with a `CHECK` does the same job.
+
+### Time
+
+| Type          | Notes                                                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `timestamp`   | Stores the date and time with no knowledge of time zones. This can cause bugs in distributed systems.            |
+| `timestamptz` | Stores an exact moment in time (internally UTC). Postgres converts it to the session time zone when you read it. |
+
+**Prefer `timestamptz` in most cases.**
+
+> `timestamptz` does not remember the time zone you inserted with. It only stores the moment, and the time zone you see comes from the session setting.
+
+### JSON
+
+| Type    | Notes                                                                                                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `json`  | Stores the text exactly as given, so it has to be parsed on every retrieval. Slow.                                                                                                         |
+| `jsonb` | Stores a parsed binary form. Whitespace is removed, key order is not kept, and duplicate keys are dropped. Fast to retrieve, can be indexed (GIN), and supports containment checks (`@>`). |
+
+**Prefer `jsonb` over `json`.** Use `json` only if you must preserve the exact original text.
+
+### Fixed values
+
+Three ways to restrict a column to a set of allowed values:
+
+| Option                     | Pros                                                                                   | Cons                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `CHECK (col IN (...))`     | Simplest. Easy to change: drop and re-add the constraint.                              | No separate type, and no table to list the values from.           |
+| `ENUM`                     | Type safe and simple. Reusable across tables.                                          | Painful to change: values can be added, but removing one is hard. |
+| Lookup table + foreign key | Easy to migrate, since values are just rows. Can carry extra data (label, sort order). | Needs a join to read the value.                                   |
+
+#### Which one to use
+
+- **Values can change without a code deploy, or carry extra data?** Lookup table.
+- **Small fixed set used in one column?** `CHECK`. This is the default pick.
+- **Same fixed set shared across several tables?** `ENUM`.
+
+```sql
+type TEXT NOT NULL CHECK (type IN ('Bug', 'Config', 'Discovery'))
+```
