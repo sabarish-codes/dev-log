@@ -78,8 +78,8 @@ Logging is easy. The value is **retrieval**: finding the right entry quickly as 
 | Field          | Required | Notes                                                         |
 | -------------- | -------- | ------------------------------------------------------------- |
 | Title          | Yes      | What you'd search for later                                   |
-| Type           | Yes      | `Bug`, `Config`, or `Discovery`                               |
-| Error message  | No       | Shown for `Bug` and `Config` only                             |
+| Type           | Yes      | `Error`, `Bug`, `Config`, or `Discovery`                               |
+| Error message  | No       | Shown for `Error`, `Bug` and `Config` only                             |
 | What happened  | No       | One box: context, expected vs actual, environment             |
 | Fix / Takeaway | Yes      | The solution and why it worked. For `Discovery`, the takeaway |
 | Project        | No       | Which project the log belongs to                              |
