@@ -245,3 +245,29 @@ PLAIN       logs / projects / tags → users
 - Test: insert a log for B pointing at A's project. It must fail.
 
 ---
+
+## 7. Case-insensitive uniqueness
+
+- `unique (user_id, name)` treats `Postgres` and `postgres` as different.
+- Table-level `unique` takes plain columns only, so use a unique index on the expression:
+
+```sql
+create unique index users_email_lower_uq  on users (lower(email));
+create unique index projects_user_name_uq on projects (user_id, lower(name));
+create unique index tags_user_name_uq     on tags (user_id, lower(name));
+```
+
+- Queries must match: `where lower(email) = lower($1)`.
+- Trim in the API before insert. `lower()` handles case, not spaces.
+- `UNIQUE` always needs an index (fast check, and concurrent inserts can't both win). These are constraint-backing, so they stay in V1.
+- **V1 rule:** no index that exists only to speed up a read. Note it in `docs/performance.md`.
+
+---
+
+## 8. Small rules
+
+- `check (btrim(col) <> '')` rejects `'   '`; `check (col <> '')` does not.
+- `date` over `timestamptz` when only the day matters: range filters are a plain `BETWEEN`, no time zone handling. Send the date from the API, since `current_date` uses the server's zone.
+- Every paginated `ORDER BY` ends with a unique column: `order by date desc, id desc`.
+- `updatedat default now()` fires on insert only. Use a trigger or set it in the app.
+- Create order: `users → projects → tags → logs → logs_tags → indexes`.
