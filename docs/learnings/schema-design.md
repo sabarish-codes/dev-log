@@ -199,3 +199,49 @@ Three ways to restrict a column to a set of allowed values:
 ```sql
 type TEXT NOT NULL CHECK (type IN ('Bug', 'Config', 'Discovery'))
 ```
+
+---
+
+## 6. Cross-user integrity
+
+### The problem
+
+A plain foreign key checks that the parent exists, not who owns it.
+
+```
+logs (project_id = 1, user_id = B)  ──►  projects (id = 1, user_id = A)   -- accepted
+```
+
+### The fix: composite foreign keys
+
+```sql
+-- parents: projects, tags, logs
+unique (id, user_id)
+
+-- child
+foreign key (project_id, user_id) references projects (id, user_id)
+  on delete set null (project_id)
+```
+
+```
+Before:  log.project_id ──► projects.id
+After:   (log.project_id, log.user_id) ──► (projects.id, projects.user_id)
+```
+
+- `unique (id, user_id)` adds no new restriction. Postgres only requires an FK to point at unique columns.
+- Null `project_id` skips the check, so logs without a project work.
+- `set null (project_id)` nulls only that column. Plain `set null` would also null `user_id` (NOT NULL → error). Needs Postgres 15+.
+
+### Which FKs are composite
+
+```
+COMPOSITE   logs → projects, logs_tags → logs, logs_tags → tags
+PLAIN       logs / projects / tags → users
+```
+
+**Rule:** child points at `users` → plain. Child points at an owned table → composite.
+
+- `logs_tags.user_id` is a copy of the owner, used only for the ownership check. Insert it from the logged-in user, never from the request.
+- Test: insert a log for B pointing at A's project. It must fail.
+
+---
