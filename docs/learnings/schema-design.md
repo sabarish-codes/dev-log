@@ -101,3 +101,47 @@ ALTER TABLE logs
   ADD COLUMN project_id BIGINT
   REFERENCES projects(id) ON DELETE SET NULL;
 ```
+
+---
+
+## 4. Constraints
+
+Constraints let the database reject bad data itself, instead of relying on app code to catch it.
+
+| Constraint | What it does                                                           |
+| ---------- | ---------------------------------------------------------------------- |
+| `NOT NULL` | Prevents null values from being inserted.                              |
+| `UNIQUE`   | Makes sure all values in a column are unique. Null values are allowed. |
+| `CHECK`    | Checks a custom boolean expression. Keeps the data tight.              |
+| `DEFAULT`  | Fallback value used when the column is left out of the insert.         |
+| Composite  | A `UNIQUE` (or primary key) across multiple columns.                   |
+
+### Details worth remembering
+
+- **`UNIQUE` and nulls:** in Postgres, nulls count as distinct from each other, so a unique column can hold many nulls.
+- **`CHECK` and nulls:** a check passes when the expression evaluates to `NULL`. Pair it with `NOT NULL` if the column must always have a valid value.
+- **`DEFAULT`:** applies only when the column is omitted. Explicitly inserting `NULL` does not trigger it.
+- **Composite unique:** the _combination_ must be unique, not each column on its own. `UNIQUE (user_id, name)` allows two users to each have a tag called `docker`, but not one user to have it twice.
+
+### In Developer Logbook
+
+```sql
+CREATE TABLE logs (
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  title         TEXT        NOT NULL,
+  type          TEXT        NOT NULL CHECK (type IN ('Bug', 'Config', 'Discovery')),
+  error_message TEXT,
+  fix           TEXT        NOT NULL,
+  time_spent    INTEGER     NOT NULL CHECK (time_spent > 0),  -- minutes
+  logged_on     DATE        NOT NULL DEFAULT CURRENT_DATE,
+  -- error message only makes sense for Bug and Config
+  CHECK (type <> 'Discovery' OR error_message IS NULL)
+);
+
+CREATE TABLE tags (
+  id      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id),
+  name    TEXT   NOT NULL,
+  UNIQUE (user_id, name)  -- composite
+);
+```
