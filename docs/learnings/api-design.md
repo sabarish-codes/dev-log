@@ -561,3 +561,300 @@ Ask these for each need:
 | **Pagination**  | Page numbers needed? Total needed? Data size? Default and max `perPage`? |
 | **Every param** | Name? Type? Default? Limit? What if invalid?                             |
 | **Response**    | What goes in `meta`? What does empty look like?                          |
+
+---
+
+## 6. API-wide concerns
+
+**API-wide concerns** apply to **every endpoint**, not one. Decide them once, globally.
+
+```
+Request
+   │
+   ▼
+Security headers → CORS → Request ID → Rate limit → Authn → Authz → Handler
+                                                                       │
+Response  ◄── Logging ◄── Error format ◄──────────────────────────────┘
+```
+
+| Concern       | Question it answers                               |
+| ------------- | ------------------------------------------------- |
+| Versioning    | How do I change the API without breaking clients? |
+| Authn / Authz | Who are you? What can you touch?                  |
+| CORS          | Which browser sites may call me?                  |
+| Rate limiting | How do I stop abuse and overload?                 |
+| Health        | Is the server alive and ready?                    |
+| Other         | Tracing, safe retries, logs, hardening            |
+
+---
+
+### Versioning
+
+**Why:** clients you don't control depend on your API. Changing it can break them. A version lets old clients keep working while new ones move on.
+
+**Path version:** the version goes in the URL.
+
+```
+/v1/orders      old clients
+/v2/orders      new clients
+```
+
+| Style  | Example                               | Note                                         |
+| ------ | ------------------------------------- | -------------------------------------------- |
+| Path   | `/v1/orders`                          | Simple, visible, easy to route. Most common. |
+| Header | `Accept: application/vnd.api.v2+json` | Clean URLs, harder to test and debug.        |
+
+#### Breaking vs non-breaking
+
+| Breaking (needs new version)        | Non-breaking (safe in same version) |
+| ----------------------------------- | ----------------------------------- |
+| Remove or rename a field            | Add a new field                     |
+| Change a field's type               | Add a new endpoint                  |
+| Make an optional param required     | Add an optional param               |
+| Change a status code or error shape | Add a new enum value*               |
+| Change the meaning of a field       |                                     |
+
+\* Safe only if clients are told to ignore values they don't know.
+
+```
+Change needed
+   │
+   ├─ Breaking?     → new version (/v2), keep /v1 until clients migrate
+   └─ Non-breaking? → ship it in the current version
+```
+
+---
+
+### Authentication and authorization
+
+|                            | Question                    | Failure |
+| -------------------------- | --------------------------- | ------- |
+| **Authn** (authentication) | Who are you?                | `401`   |
+| **Authz** (authorization)  | Are you allowed to do this? | `403`   |
+
+Authn always comes first.
+
+#### Password storage
+
+```
+signup:  password → hash(password + salt) → store the hash
+login:   hash(input + salt) → compare with stored hash
+```
+
+- Use a slow, salted hash: **argon2id** or **bcrypt**.
+- Never store the password. Never use plain SHA or MD5. Never encrypt, because encryption can be reversed.
+- The slowness is on purpose, so guessing is expensive for an attacker.
+
+#### JWT and the bearer token
+
+A **JWT** is a signed token that carries claims.
+
+```
+header . payload . signature
+         │
+         └─ { "sub": "42", "exp": 1760000000 }
+```
+
+- **Signed, not encrypted.** Anyone can read the payload, so keep secrets out.
+- The server checks the signature and `exp`, so it needs **no session lookup** (this is what "stateless" gives you).
+- **Bearer token:** the client sends it in a header on every request.
+
+```
+Authorization: Bearer <token>
+```
+
+#### Access + refresh token
+
+One long-lived token is dangerous: if stolen, it works for a long time. So use two.
+
+|              | Access token         | Refresh token             |
+| ------------ | -------------------- | ------------------------- |
+| Purpose      | Call the API         | Get a new access token    |
+| Lifetime     | Short (about 15 min) | Long (days to weeks)      |
+| Sent to      | Every endpoint       | Only the refresh endpoint |
+| Stored in DB | No                   | Yes (hashed)              |
+
+```
+Login
+  │
+  ▼
+access + refresh issued
+  │
+  ▼
+call API with access ──► 200
+  │
+  ▼  (access expires)
+call API ──► 401
+  │
+  ▼
+POST /auth/refresh (refresh token) ──► new access (+ new refresh)
+  │
+  ▼  (refresh expires or is revoked)
+login again
+```
+
+- **Rotation:** each refresh issues a new refresh token and invalidates the old one. A reused old token signals theft.
+- Browser apps: keep the refresh token in an **httpOnly, secure cookie** so JavaScript can't read it.
+
+#### Logout and revocation
+
+```
+Logout  →  delete the refresh token from the DB
+```
+
+| Token   | Can it be revoked?                                          |
+| ------- | ----------------------------------------------------------- |
+| Refresh | Yes. It's in the DB, so delete it.                          |
+| Access  | Not really. It is stateless, so it stays valid until `exp`. |
+
+So the access token must be **short-lived**. For instant revoke you need a denylist, which brings state back.
+
+**Revoke all sessions** (password change, stolen device): delete all of that user's refresh tokens.
+
+#### Ownership checks
+
+Authz for user data means: **does this resource belong to the caller?**
+
+```
+GET /orders/42
+   │
+   ▼
+Authn: token valid? → user = 7
+   │
+   ▼
+Load order 42 where id = 42 AND user_id = 7
+   │
+   ├─ found    → 200
+   └─ not found → 404
+```
+
+- **Scope every query by the owner** (`WHERE id = ? AND user_id = ?`). Never load by id alone, then check.
+- Return `404`, not `403`, for someone else's resource. `403` confirms it exists.
+- Take the user id from the **token**, never from the request body or URL.
+
+---
+
+### CORS
+
+**What:** a **browser rule** that blocks a web page from calling an API on a different origin, unless the API allows it.
+
+```
+Origin = scheme + host + port
+https://app.com  →  https://api.com    different origin → CORS applies
+```
+
+```
+Browser                              API
+   │── OPTIONS (preflight) ─────────►  │   "may app.com call you?"
+   │◄── Access-Control-Allow-* ──────  │
+   │── real request ────────────────►  │
+```
+
+| Header                             | Meaning                           |
+| ---------------------------------- | --------------------------------- |
+| `Access-Control-Allow-Origin`      | Which origins are allowed         |
+| `Access-Control-Allow-Methods`     | Which methods are allowed         |
+| `Access-Control-Allow-Headers`     | Which request headers are allowed |
+| `Access-Control-Allow-Credentials` | Whether cookies are allowed       |
+
+- Allow an **explicit list of origins**, not `*`. With cookies, `*` is not allowed at all.
+- CORS is **not security** against other clients. `curl` and servers ignore it, so auth is still required.
+
+---
+
+### Rate limiting
+
+**Why:** stops abuse, brute-force login attempts, and one client overloading the server.
+
+```
+Request
+   │
+   ▼
+Count requests for this key in the time window
+   │
+   ├─ under limit → continue
+   └─ over limit  → 429 + Retry-After
+```
+
+| Decision             | Options                                             |
+| -------------------- | --------------------------------------------------- |
+| Key (who is counted) | IP (before login), user id (after login), API key   |
+| Window               | e.g. 100 requests per minute                        |
+| Strictness           | Tighter on login, signup, and password reset        |
+| Algorithm            | Fixed window (simple), token bucket (allows bursts) |
+
+Headers to send:
+
+```
+429 Too Many Requests
+Retry-After: 30
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+```
+
+Running more than one server? Keep the counters in a **shared store** (like Redis), not in each server's memory.
+
+---
+
+### Health endpoint
+
+**Why:** load balancers, orchestrators, and monitors need to ask "is it alive?"
+
+| Endpoint             | Question                | Checks                           |
+| -------------------- | ----------------------- | -------------------------------- |
+| `/health` (liveness) | Is the process running? | Nothing else. Fast.              |
+| `/ready` (readiness) | Can it serve traffic?   | Database and other dependencies. |
+
+```
+GET /health  →  200 { "status": "ok" }
+GET /ready   →  200 or 503 if the DB is down
+```
+
+- No auth, no rate limit, no version prefix.
+- Don't leak internals (versions, hostnames, connection strings).
+
+---
+
+### Other
+
+| Concern              | What                                                       | How                                                                                                                                |
+| -------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Request ID**       | One id per request, to trace it across logs                | Generate it (or accept `X-Request-Id`), put it in every log line, return it in the response header and error body                  |
+| **Idempotency key**  | Makes `POST` safe to retry (network timeout, double click) | Client sends `Idempotency-Key: <uuid>`. Server stores key + result. Same key again → return the stored result, don't redo the work |
+| **Logging**          | A record of what happened                                  | Structured JSON: request id, method, path, status, duration, user id. Never log passwords, tokens, or secrets                      |
+| **Security headers** | Browser-side hardening                                     | Set by middleware (such as `helmet` in Express)                                                                                    |
+
+```
+POST /orders   Idempotency-Key: abc
+   │
+   ├─ key unseen → do the work, store result under "abc"
+   └─ key seen   → return the stored result (no second order)
+```
+
+Common security headers:
+
+| Header                                | Effect                     |
+| ------------------------------------- | -------------------------- |
+| `Strict-Transport-Security`           | Force HTTPS                |
+| `X-Content-Type-Options: nosniff`     | Stop MIME sniffing         |
+| `Content-Security-Policy`             | Limit what a page can load |
+| `X-Frame-Options` / `frame-ancestors` | Block clickjacking         |
+
+---
+
+### Design checklist
+
+| Concern              | Ask                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| **Versioning**       | Where does the version go? What counts as breaking? How long is the old version supported? |
+| **Authn**            | How do users prove identity? How are passwords stored?                                     |
+| **Tokens**           | Access lifetime? Refresh lifetime? Where is each stored? Rotation?                         |
+| **Logout**           | What is deleted? Can I revoke all sessions?                                                |
+| **Authz**            | Who owns each resource? Is every query scoped by owner? 404 or 403?                        |
+| **CORS**             | Which origins? Are cookies used?                                                           |
+| **Rate limit**       | Per what key? What limit? Stricter on which endpoints?                                     |
+| **Health**           | Liveness only, or readiness too?                                                           |
+| **Request ID**       | Generated where? Logged where? Returned where?                                             |
+| **Idempotency**      | Which `POST`s must be safe to retry?                                                       |
+| **Logging**          | What fields? What must never be logged?                                                    |
+| **Security headers** | Is the middleware on globally?                                                             |
