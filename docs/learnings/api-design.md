@@ -295,3 +295,269 @@ Every error, from any endpoint, has the same shape. The client then needs one er
 - Match the HTTP status code to the error: `422` for validation, `404` for a missing log, and so on (see section 2).
 - Never leak internals (stack traces, SQL) in an error body.
 - There is also a standard, **RFC 9457 Problem Details** (`application/problem+json`). Worth knowing, but a simple custom schema is fine if it stays consistent.
+
+---
+
+## 5. Collection design
+
+### Why
+
+A **collection** = an endpoint that returns a **list** (`GET /orders`).
+
+```
+Without rules                    With rules
+─────────────                    ──────────
+every list endpoint              every list endpoint
+has its own params         →     uses the same params
+client must learn each           client learns once
+```
+
+**Goal:** the same params mean the same thing everywhere.
+
+---
+
+### The flow
+
+Every list request goes through the same steps, in this order:
+
+```
+Request
+   │
+   ▼
+1. Validate params   → bad? stop, return 400
+   │
+   ▼
+2. Search            (q)
+   │
+   ▼
+3. Filter            (type, status, dates...)
+   │
+   ▼
+4. Sort              (sort)
+   │
+   ▼
+5. Paginate          (page, perPage)
+   │
+   ▼
+Response = data + meta
+```
+
+---
+
+### The 4 pillars
+
+| Pillar     | Question              | Param               |
+| ---------- | --------------------- | ------------------- |
+| Search     | Contains these words? | `q=cookie`          |
+| Filter     | Has these attributes? | `status=open`       |
+| Sort       | In what order?        | `sort=-date`        |
+| Pagination | Which slice?          | `page=2&perPage=20` |
+
+All are **query params**, all **optional**, all combine.
+
+```
+GET /orders?q=shoes&status=open&sort=-date&page=2&perPage=20
+```
+
+---
+
+### Rule for every param
+
+Each param needs 4 things. Missing one = guessing.
+
+| Name      | Type    | Default | Limit               |
+| --------- | ------- | ------- | ------------------- |
+| `page`    | integer | `1`     | min 1               |
+| `perPage` | integer | `20`    | max 100             |
+| `sort`    | enum    | `-date` | allowed fields only |
+| `q`       | string  | none    | max 200 chars       |
+
+> No params at all must still work. Defaults make that possible.
+
+---
+
+### Invalid params
+
+```
+page=abc          →  400
+perPage=500       →  400
+sort=banana       →  400
+unknown param     →  400
+```
+
+**Reject, don't fix silently.** Silent fixing hides client bugs.
+
+---
+
+### Filtering
+
+**Rule: OR inside one field, AND between fields.**
+
+```
+GET /orders?status=open,paid&city=chennai
+
+(status = open OR paid)  AND  (city = chennai)
+└────── one field ──────┘      └─ other field ─┘
+```
+
+| Case                    | Example                                 |
+| ----------------------- | --------------------------------------- |
+| Exact match             | `status=open`                           |
+| Multi-value (one field) | `status=open,paid`                      |
+| Multiple fields         | `status=open&city=chennai`              |
+| Range                   | `dateFrom=2026-01-01&dateTo=2026-10-20` |
+
+- Range ends are **inclusive**. Either end can be used alone.
+- Multi-value format: **comma-separated**. Pick one format and use it everywhere.
+
+#### Any vs all
+
+Only matters for fields where one item has **many** values (like tags).
+
+```
+tags=a,b
+
+any → has a OR b      (wider result)
+all → has a AND b     (narrower result)
+```
+
+Add a param (`match=any|all`) with a default.
+
+---
+
+### Search
+
+```
+q=shoes            one word
+q=red shoes        both words (AND)
+q="red shoes"      exact phrase
+```
+
+- Searches **many fields** at once.
+- Case-insensitive.
+- Empty `q` = no search.
+- Combines with filters using **AND**.
+
+**Typo tolerance** = fuzzy match (`cokie` finds `cookie`). The API only exposes `q`. How it's done inside can change later.
+
+---
+
+### Sorting
+
+```
+sort=date     →  oldest first   (ascending)
+sort=-date    →  newest first   (descending)
+```
+
+- `-` prefix = descending.
+- Accept **only allowed fields**. Never paste input into `ORDER BY`.
+- **Add a tiebreaker** (`id`). Without it, equal values can repeat or vanish across pages.
+
+```
+ORDER BY date DESC, id DESC
+```
+
+---
+
+### Pagination
+
+Never return everything. Return a slice.
+
+#### Offset (page number)
+
+```
+page=3, perPage=20  →  skip 40, take 20
+
+[ 1-20 ][ 21-40 ][ 41-60 ]...
+  p1       p2       p3
+```
+
+| Good             | Bad                                               |
+| ---------------- | ------------------------------------------------- |
+| Simple           | Slow on deep pages (reads then discards rows)     |
+| Jump to any page | Shifts when rows are added (duplicates or misses) |
+| Easy total count | Count query is costly at scale                    |
+
+#### Cursor (keyset)
+
+"Give me 20 rows **after this row**."
+
+```
+page 1 → last row: (date=10 Oct, id=42)
+page 2 → cursor = that row
+         WHERE (date, id) < (10 Oct, 42)
+```
+
+| Good                       | Bad                      |
+| -------------------------- | ------------------------ |
+| Fast on any page           | No jump to page N        |
+| Stable when rows are added | Hard to show total pages |
+|                            | More complex             |
+
+#### Which one?
+
+```
+Need page numbers / jump / total?  →  Offset
+Huge data / infinite scroll?       →  Cursor
+Not sure?                          →  Start offset, measure, switch if slow
+```
+
+---
+
+### Response shape
+
+```json
+{
+  "data": [ ... ],
+  "meta": {
+    "total": 312,
+    "page": 2,
+    "perPage": 20,
+    "totalPages": 16
+  }
+}
+```
+
+- `total` = matches for the current filters, not the whole table.
+- `page` and `perPage` = the values actually used, including defaults.
+- Cursor version: `meta` has `nextCursor` and `hasMore` instead.
+
+---
+
+### Empty result
+
+```
+No matches  →  200 OK + "data": [] + total: 0
+```
+
+- **Not an error.** `404` means the endpoint doesn't exist, not that a search found nothing.
+- A page past the last one → also `200` with empty `data`.
+
+---
+
+### Keeping state across pages
+
+The API is **stateless**, so the server forgets between requests.
+
+```
+Client sends ALL params on EVERY request
+Client keeps them in its URL (refresh, back button and shared links work)
+```
+
+- Search, filter, or sort changes → reset `page` to 1.
+- "Clear filters" = request with no params (defaults apply).
+
+---
+
+### Design checklist (use this on any requirement)
+
+Ask these for each need:
+
+| Need            | Questions                                                                |
+| --------------- | ------------------------------------------------------------------------ |
+| **Search**      | Which fields? One word, many, or exact phrase? Typos allowed?            |
+| **Filter**      | Which fields? One value or many? Any or all? Ranges?                     |
+| **Sort**        | Which fields allowed? Default order? Tiebreaker?                         |
+| **Pagination**  | Page numbers needed? Total needed? Data size? Default and max `perPage`? |
+| **Every param** | Name? Type? Default? Limit? What if invalid?                             |
+| **Response**    | What goes in `meta`? What does empty look like?                          |
