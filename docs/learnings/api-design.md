@@ -213,3 +213,85 @@ Nest paths only when they represent a **strong parent-child hierarchy**. Maximum
 
 - Once a child has a unique id, address it directly: `/logs/{id}` instead of `/projects/{projectId}/logs/{id}`.
 - Deep paths force clients to know every ancestor id and make the API harder to change.
+
+---
+
+## 4. Payload design
+
+Payload design is the structure of the data that travels in the request and response bodies. Predictable payloads mean clients never have to guess.
+
+### Format
+
+- For web APIs, **JSON** is the usual choice.
+- Declare it with the header `Content-Type: application/json`, on requests with a body and on responses.
+
+### Naming: camelCase
+
+- `camelCase` is the industry standard for JSON keys: `timeSpent`, `errorMessage`, `createdAt`.
+- Pick one convention and use it everywhere. Mixing `camelCase` and `snake_case` is the real mistake.
+- The database uses `snake_case` (`time_spent`), so the mapping happens once, at the API boundary.
+
+### Dates and times
+
+Standardize on **ISO 8601** strings, always in **UTC**.
+
+| Kind      | Format                 | Example                  |
+| --------- | ---------------------- | ------------------------ |
+| Timestamp | `YYYY-MM-DDTHH:mm:ssZ` | `"2026-10-20T08:30:00Z"` |
+| Date only | `YYYY-MM-DD`           | `"2026-10-20"`           |
+
+- The trailing `Z` means UTC. Never send a timestamp without a zone.
+- The server stores and returns UTC (`timestamptz`), and the client converts to the user's local time for display.
+- Don't send epoch numbers or custom formats like `20/10/2026`, which are ambiguous.
+- Use date-only for values with no time of day, like a log's date.
+
+### Bare data vs envelope
+
+Two ways to shape a response.
+
+**Bare data:** the body is the resource itself.
+
+```json
+{ "id": 42, "title": "Cookie not sent in production" }
+```
+
+**Envelope:** the data is wrapped, with room for metadata beside it.
+
+```json
+{
+  "data": [{ "id": 42, "title": "Cookie not sent in production" }],
+  "meta": { "total": 312, "page": 2, "limit": 20 }
+}
+```
+
+|          | Pros                                   | Cons                                                    |
+| -------- | -------------------------------------- | ------------------------------------------------------- |
+| Bare     | Simple, less nesting.                  | Nowhere to add metadata later without breaking clients. |
+| Envelope | Extensible: pagination, counts, links. | Slightly more verbose.                                  |
+
+- Lists usually need metadata (result count, page), so they fit the envelope.
+- Whichever you choose, **use it consistently** across every endpoint.
+
+### Predictable error schema
+
+Every error, from any endpoint, has the same shape. The client then needs one error handler.
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": [{ "field": "timeSpent", "message": "Must be greater than 0" }]
+  }
+}
+```
+
+| Field     | Purpose                                                               |
+| --------- | --------------------------------------------------------------------- |
+| `code`    | Stable machine-readable identifier. Clients branch on this.           |
+| `message` | Human-readable summary. Can change without breaking clients.          |
+| `details` | Optional list of specific problems, like per-field validation errors. |
+
+- Match the HTTP status code to the error: `422` for validation, `404` for a missing log, and so on (see section 2).
+- Never leak internals (stack traces, SQL) in an error body.
+- There is also a standard, **RFC 9457 Problem Details** (`application/problem+json`). Worth knowing, but a simple custom schema is fine if it stays consistent.
