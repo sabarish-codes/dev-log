@@ -125,3 +125,91 @@ The first digit gives the class.
 | `Location`      | Sent by the server, usually with `201`, giving the exact URL of the created resource.  |
 
 ---
+
+## 3. URL and REST API design
+
+A URL is the address of a resource. REST is the style that says an API is made of resources, each with its own URL, and the HTTP method says what to do with it. So REST API design is mostly URL design: first understand the parts of a URL, then apply the REST rules to them.
+
+```
+GET    /orders/42    →  read order 42
+DELETE /orders/42    →  remove order 42
+```
+
+### URL anatomy
+
+A URL points to a specific resource on a server.
+
+```
+https://api.example.com/v1/orders/42?status=open
+└─┬──┘   └─────┬─────┘ └────┬─────┘ └────┬────┘
+scheme       host        path        query string
+```
+
+| Part               | What it is                                                     | Example                          |
+| ------------------ | -------------------------------------------------------------- | -------------------------------- |
+| **Scheme**         | Protocol used to access the resource.                          | `https`                          |
+| **Host / domain**  | Server hosting the API.                                        | `api.example.com`                |
+| **Path**           | Hierarchical route to the resource.                            | `/v1/orders`                     |
+| **Path parameter** | A variable embedded in the path to identify one unique item.   | `/v1/orders/{id}`                |
+| **Query string**   | Key-value pairs after `?`, used to filter, sort, and paginate. | `/v1/orders?category=electronic` |
+
+### REST
+
+REST is an architectural style for client-server applications, based on **resources** and **statelessness**.
+
+- **Resource:** a thing the API exposes (a user, an order, a log). It is a noun and has its own URL.
+- **Representation:** the client never touches the resource itself, only a representation of it, usually JSON.
+- **Method = action:** the URL says _what_, the HTTP method says _what to do with it_.
+- **Stateless:** every request carries everything the server needs (see section 2).
+
+### Design rules
+
+#### Naming
+
+- Use **plural, lowercase nouns** for resources.
+- Use **hyphens** for multi-word resources.
+
+```
+/users
+/order-items
+```
+
+- A collection and one of its items share the same base: `/orders` and `/orders/{id}`.
+- **No verbs in the path.** The HTTP method already states the action.
+
+| Don't                    | Do                  |
+| ------------------------ | ------------------- |
+| `GET /getOrders`         | `GET /orders`       |
+| `POST /createOrder`      | `POST /orders`      |
+| `DELETE /deleteOrder/42` | `DELETE /orders/42` |
+
+#### Exception: actions
+
+Some operations can't be expressed by the HTTP methods. For these, a verb is allowed at the end of the path, usually with `POST`.
+
+```
+POST /payments/{id}/refund
+```
+
+> Before using an action endpoint, check whether it can be modeled as a resource instead. `POST /payments/{id}/refunds` creates a refund, which keeps the URL noun-only and gives you something to `GET` later.
+
+#### Parameters
+
+| Type             | Used for                        | Example                      |
+| ---------------- | ------------------------------- | ---------------------------- |
+| **Path params**  | Uniquely finding one resource.  | `/orders/{id}`               |
+| **Query params** | Filtering, sorting, pagination. | `/orders?sort=-price&page=2` |
+
+- A leading `-` in `sort` is a common convention for descending order, so `-price` means highest price first.
+
+#### Nesting
+
+Nest paths only when they represent a **strong parent-child hierarchy**. Maximum depth is **2**. Prefer shallow.
+
+```
+/projects/{projectId}/logs             ✅ depth 2
+/users/{userId}/projects/{id}/logs     ❌ too deep
+```
+
+- Once a child has a unique id, address it directly: `/logs/{id}` instead of `/projects/{projectId}/logs/{id}`.
+- Deep paths force clients to know every ancestor id and make the API harder to change.
