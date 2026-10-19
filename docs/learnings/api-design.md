@@ -858,3 +858,192 @@ Common security headers:
 | **Idempotency**      | Which `POST`s must be safe to retry?                                                       |
 | **Logging**          | What fields? What must never be logged?                                                    |
 | **Security headers** | Is the middleware on globally?                                                             |
+
+---
+
+## 7. OpenAPI
+
+### What and why
+
+**OpenAPI** = a standard file (`openapi.yaml`) that describes a REST API: endpoints, inputs, responses, auth. It holds **no code**.
+
+```
+                        ┌─► docs page (Swagger UI, Redoc)
+openapi.yaml ───────────┼─► mock server
+ (one source of truth)  ├─► generated types / clients
+                        └─► request validation, contract tests
+```
+
+### How to use it
+
+```
+Design API → write openapi.yaml → preview (Swagger Editor)
+          → lint (Spectral) → keep in repo, update with every API change
+```
+
+**Add an endpoint:** put it under `paths`, reuse schemas from `components`, lint.
+
+---
+
+### File anatomy
+
+```
+openapi.yaml
+├── openapi       spec version (3.1.0)
+├── info          title, API version
+├── servers       base URL (https://api.example.com/v1)
+├── security      default auth
+├── paths         endpoints            ◄── main part
+│   └── /orders
+│       └── get / post                 (operations)
+└── components    reusable pieces      ◄── write once, $ref everywhere
+    ├── schemas
+    ├── parameters
+    ├── responses
+    └── securitySchemes
+```
+
+---
+
+### Operation
+
+One path + one method = one endpoint.
+
+| Key           | Purpose                         |
+| ------------- | ------------------------------- |
+| `summary`     | One-line description            |
+| `operationId` | Unique name                     |
+| `parameters`  | Path, query, header inputs      |
+| `requestBody` | Body sent in                    |
+| `responses`   | Every status code it can return |
+| `security`    | Override default auth           |
+
+### Parameters
+
+```yaml
+- name: id
+  in: path # path | query | header | cookie
+  required: true # path params are always required
+  schema: { type: integer }
+```
+
+Collection rules (name, type, default, limit) go here: `schema.type`, `schema.default`, `schema.minimum`, `schema.maximum`.
+
+### Schema keywords
+
+| Keyword                   | Meaning                                         |
+| ------------------------- | ----------------------------------------------- |
+| `type`                    | string, integer, number, boolean, object, array |
+| `properties`              | Fields of an object                             |
+| `required`                | List of required fields (on the object)         |
+| `items`                   | Type of array elements                          |
+| `enum`                    | Allowed values                                  |
+| `format`                  | date, date-time, email, uuid                    |
+| `minimum` / `maximum`     | Number range                                    |
+| `minLength` / `maxLength` | String length                                   |
+| `default` / `example`     | Fallback value / sample                         |
+| `$ref`                    | Point to a reusable component                   |
+
+### `$ref`
+
+```
+'#/components/schemas/Order'
+ this file → section → name
+```
+
+Define once in `components`, reference everywhere.
+
+### Responses
+
+List **every** status code the endpoint can return. `description` is required.
+
+Shared errors go in `components/responses` and all use the same `Error` schema.
+
+### Security
+
+```
+1. define  →  components.securitySchemes.bearerAuth
+2. apply   →  top-level security: [bearerAuth]
+Public endpoint  →  security: []
+```
+
+---
+
+### Example
+
+```yaml
+openapi: 3.1.0
+info: { title: Orders API, version: 1.0.0 }
+servers: [{ url: https://api.example.com/v1 }]
+security: [{ bearerAuth: [] }]
+
+paths:
+  /orders/{id}:
+    get:
+      summary: Get one order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: The order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  schemas:
+    Order:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [open, paid] }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+```
+
+---
+
+### Where earlier decisions go
+
+| Decision                       | In OpenAPI                       |
+| ------------------------------ | -------------------------------- |
+| Method, URL                    | `paths` + operation key          |
+| Status codes, response headers | `responses`                      |
+| Query/path/header params       | `parameters`                     |
+| Payload and error shapes       | `components/schemas`             |
+| Collection params and envelope | `parameters` + `PageMeta` schema |
+| Version                        | `servers.url`, `info.version`    |
+| Auth                           | `securitySchemes` + `security`   |
+
+### Can't be documented
+
+OpenAPI describes the **contract** (in and out), not the **behavior** inside the server.
+
+CORS, security headers, password hashing, token rotation, ownership checks, and middleware order are not in the file. Write rate-limit numbers and field rules (like `dateFrom ≤ dateTo`) in `description`.
