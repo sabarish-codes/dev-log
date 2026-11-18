@@ -13,6 +13,6 @@
     "declaration": true,
     "declarationMap": true
   },
-  "include": ["src/**/*.ts", "server.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "server.ts", "tests/**/*.ts", "drizzle.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
