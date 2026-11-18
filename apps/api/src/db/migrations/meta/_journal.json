@@ -8,6 +8,13 @@
       "when": 1795016559435,
       "tag": "0000_worried_harry_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795017307699,
+      "tag": "0001_enable_pg_trgm",
+      "breakpoints": true
     }
   ]
 }

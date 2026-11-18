@@ -1,0 +1,122 @@
+{
+  "id": "608d6e53-dde5-42fd-bc87-5feb502bb5a3",
+  "prevId": "26f595d2-2291-47c4-af26-82aa4f310f18",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "name": "users_id_seq",
+            "increment": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "startWith": "1",
+            "cache": "1",
+            "cycle": false,
+            "schema": "public",
+            "type": "always"
+          }
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "users_email_lower": {
+          "name": "users_email_lower",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "isExpression": true,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "users_username_not_blank": {
+          "name": "users_username_not_blank",
+          "value": "btrim(\"users\".\"username\") <> ''"
+        },
+        "users_username_not_exceeding": {
+          "name": "users_username_not_exceeding",
+          "value": "length(\"users\".\"username\") <= 128"
+        },
+        "users_email_not_blank": {
+          "name": "users_email_not_blank",
+          "value": "btrim(\"users\".\"email\") <> ''"
+        },
+        "users_email_not_exceeding": {
+          "name": "users_email_not_exceeding",
+          "value": "length(\"users\".\"email\") <= 256"
+        },
+        "users_password_hash_not_blank": {
+          "name": "users_password_hash_not_blank",
+          "value": "btrim(\"users\".\"password_hash\") <> ''"
+        },
+        "users_password_hash_not_exceeding": {
+          "name": "users_password_hash_not_exceeding",
+          "value": "length(\"users\".\"password_hash\") <= 256"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
