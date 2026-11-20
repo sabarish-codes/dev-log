@@ -2,6 +2,7 @@ import express from 'express';
 import type { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { pinoHttp } from 'pino-http';
 import { logger } from './config/logger.js';
 import { env } from './config/env.js';
@@ -12,6 +13,7 @@ import { metricsRouter } from './routes/metrics.js';
 import { docsRouter } from './routes/docs.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { authRouter } from './routes/auth.js';
 
 export function createApp(): Application {
   const app = express();
@@ -26,6 +28,8 @@ export function createApp(): Application {
 
   app.use(express.json({ limit: '10kb' }));
 
+  app.use(cookieParser());
+
   app.use(rateLimiter);
 
   app.use(checkRouter);
@@ -35,6 +39,8 @@ export function createApp(): Application {
   app.use(metricsRouter);
 
   app.use(docsRouter);
+
+  app.use('/api/v1/auth', authRouter);
 
   app.use(notFound);
 
