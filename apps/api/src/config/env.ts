@@ -16,6 +16,10 @@ const envSchema = z.object({
     .default('info'),
 
   CORS_ORIGIN: z.url(),
+
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().positive().default(7),
 });
 
 const result = envSchema.safeParse(process.env);
