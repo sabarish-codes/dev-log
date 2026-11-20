@@ -3,6 +3,7 @@ import { LandingPage } from './pages/Landing';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
 import { LogsPage } from './pages/Logs';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 export const router = createBrowserRouter([
   {
@@ -17,9 +18,15 @@ export const router = createBrowserRouter([
     path: '/register',
     element: <RegisterPage />,
   },
+  // Protected Routes
   {
-    path: '/logs',
-    element: <LogsPage />,
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: '/logs',
+        element: <LogsPage />,
+      },
+    ],
   },
   {
     path: '*',
