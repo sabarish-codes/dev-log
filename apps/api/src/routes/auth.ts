@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import * as authController from '../controllers/auth.js';
 import { validate } from '../middleware/validate.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const authRouter: Router = Router();
 
@@ -27,3 +28,7 @@ authRouter.post(
   validate({ body: loginSchema }),
   authController.login,
 );
+
+authRouter.get('/me', requireAuth, authController.me);
+authRouter.post('/refresh', authController.refresh);
+authRouter.post('/logout', authController.logout);

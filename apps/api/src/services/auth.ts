@@ -1,10 +1,14 @@
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 import { db } from '../config/drizzle.js';
 import { users } from '../db/schema.js';
 import { AppError } from '../errors/AppError.js';
-import { hashPassword } from '../utils/password.js';
-import { createRefreshToken, signAccessToken } from '../utils/token.js';
-import { verifyPassword } from '../utils/password.js';
+import { hashPassword, verifyPassword } from '../utils/password.js';
+import {
+  createRefreshToken,
+  signAccessToken,
+  revokeRefreshToken,
+  verifyRefreshToken,
+} from '../utils/token.js';
 
 interface RegisterInput {
   username: string;
@@ -81,4 +85,49 @@ export async function loginUser(input: LoginInput) {
     accessToken,
     refreshToken,
   };
+}
+
+export async function getCurrentUser(userId: number) {
+  const [user] = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      email: users.email,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+  return user;
+}
+export async function rotateRefreshToken(token: string) {
+  const userId = await verifyRefreshToken(token);
+  if (!userId) {
+    throw new AppError('Invalid or expired refresh token', 401);
+  }
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) {
+    await revokeRefreshToken(token);
+    throw new AppError('User not found', 401);
+  }
+  // Token rotation: revoke previous, create new
+  await revokeRefreshToken(token);
+  const newRefreshToken = await createRefreshToken(user.id);
+  const newAccessToken = await signAccessToken({
+    userId: user.id,
+    email: user.email,
+  });
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+}
+export async function logoutUser(token?: string) {
+  if (token) {
+    await revokeRefreshToken(token);
+  }
 }
