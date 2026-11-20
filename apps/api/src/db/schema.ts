@@ -31,10 +31,10 @@ export const users = pgTable(
     check('users_username_not_exceeding', sql`length(username) <= 128`),
     check('users_email_not_blank', sql`btrim(email) <> ''`),
     check('users_email_not_exceeding', sql`length(email) <= 256`),
-    check('users_password_hash_not_blank', sql`btrim(passwordHash) <> ''`),
+    check('users_password_hash_not_blank', sql`btrim(password_hash) <> ''`),
     check(
       'users_password_hash_not_exceeding',
-      sql`length(passwordHash) <= 256`,
+      sql`length(password_hash) <= 256`,
     ),
   ],
 );
