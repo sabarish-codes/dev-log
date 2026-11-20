@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { LandingPage } from './pages/Landing';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
+import { LogsPage } from './pages/Logs';
 
 export const router = createBrowserRouter([
   {
@@ -18,11 +19,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/logs',
-    element: (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Logbook Dashboard (Coming in Slice 2)
-      </div>
-    ),
+    element: <LogsPage />,
   },
   {
     path: '*',
