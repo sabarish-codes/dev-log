@@ -27,20 +27,14 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex('users_email_lower').on(sql`lower(${table.email})`),
-    check('users_username_not_blank', sql`btrim(${table.username}) <> ''`),
-    check(
-      'users_username_not_exceeding',
-      sql`length(${table.username}) <= 128`,
-    ),
-    check('users_email_not_blank', sql`btrim(${table.email}) <> ''`),
-    check('users_email_not_exceeding', sql`length(${table.email}) <= 256`),
-    check(
-      'users_password_hash_not_blank',
-      sql`btrim(${table.passwordHash}) <> ''`,
-    ),
+    check('users_username_not_blank', sql`btrim(username) <> ''`),
+    check('users_username_not_exceeding', sql`length(username) <= 128`),
+    check('users_email_not_blank', sql`btrim(email) <> ''`),
+    check('users_email_not_exceeding', sql`length(email) <= 256`),
+    check('users_password_hash_not_blank', sql`btrim(passwordHash) <> ''`),
     check(
       'users_password_hash_not_exceeding',
-      sql`length(${table.passwordHash}) <= 256`,
+      sql`length(passwordHash) <= 256`,
     ),
   ],
 );
