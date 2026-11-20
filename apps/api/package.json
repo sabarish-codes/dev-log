@@ -12,8 +12,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test": "node --env-file=.env ./node_modules/jest/bin/jest.js",
-    "test:watch": "node --env-file=.env ./node_modules/jest/bin/jest.js --watch"
+    "test": "node --experimental-vm-modules --env-file=.env ./node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules --env-file=.env ./node_modules/jest/bin/jest.js --watch"
   },
   "devDependencies": {
     "@swc/core": "^1.16.13",
