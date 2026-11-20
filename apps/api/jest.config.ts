@@ -5,8 +5,9 @@ const config: Config = {
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
   transform: {
-    '^.+\\.ts$': '@swc/jest',
+    '^.+\\.[tj]s$': '@swc/jest',
   },
+  transformIgnorePatterns: [],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
