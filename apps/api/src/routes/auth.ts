@@ -16,3 +16,14 @@ authRouter.post(
   validate({ body: registerSchema }),
   authController.register,
 );
+
+const loginSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(1),
+});
+
+authRouter.post(
+  '/login',
+  validate({ body: loginSchema }),
+  authController.login,
+);
