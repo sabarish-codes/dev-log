@@ -15,6 +15,13 @@
       "when": 1795017307699,
       "tag": "0001_enable_pg_trgm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795189081409,
+      "tag": "0002_busy_jackpot",
+      "breakpoints": true
     }
   ]
 }
