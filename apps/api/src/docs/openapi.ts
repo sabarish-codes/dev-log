@@ -257,6 +257,84 @@ export const openapiSpec = {
         },
       },
     },
+    '/api/v1/logs/{id}': {
+      get: {
+        summary: 'Get log details',
+        tags: ['Logs'],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'integer' },
+          },
+        ],
+        responses: {
+          '200': { description: 'Log detail' },
+          '404': { description: 'Log not found' },
+        },
+      },
+      patch: {
+        summary: 'Update log entry',
+        tags: ['Logs'],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'integer' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  type: {
+                    type: 'string',
+                    enum: ['bug', 'error', 'config', 'discovery'],
+                  },
+                  errorMsg: { type: 'string' },
+                  whatHappened: { type: 'string' },
+                  fixTakeaway: { type: 'string' },
+                  link: { type: 'string' },
+                  date: { type: 'string', format: 'date' },
+                  timespentMinutes: { type: 'integer' },
+                  project: { type: 'string' },
+                  tags: { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Log updated successfully' },
+          '404': { description: 'Log not found' },
+        },
+      },
+      delete: {
+        summary: 'Delete log entry',
+        tags: ['Logs'],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'integer' },
+          },
+        ],
+        responses: {
+          '200': { description: 'Log deleted successfully' },
+          '404': { description: 'Log not found' },
+        },
+      },
+    },
   },
 
   components: {
