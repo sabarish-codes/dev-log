@@ -25,3 +25,5 @@ logsRouter.post(
   validate({ body: createLogSchema }),
   logController.createLog,
 );
+
+logsRouter.get('/', requireAuth, logController.getLogs);
