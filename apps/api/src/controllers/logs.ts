@@ -11,3 +11,11 @@ export const getLogs: RequestHandler = asyncHandler(async (req, res) => {
   const logs = await logService.getLogs(req.user!.userId);
   res.status(200).json({ data: { logs } });
 });
+
+export const getLogById: RequestHandler = asyncHandler(async (req, res) => {
+  const log = await logService.getLogById(
+    req.user!.userId,
+    Number(req.params.id),
+  );
+  res.status(200).json({ data: { log } });
+});
