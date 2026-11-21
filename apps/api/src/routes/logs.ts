@@ -61,3 +61,10 @@ logsRouter.patch(
   validate({ params: logIdParamSchema, body: updateLogSchema }),
   logController.updateLog,
 );
+
+logsRouter.delete(
+  '/:id',
+  requireAuth,
+  validate({ params: logIdParamSchema }),
+  logController.deleteLog,
+);
