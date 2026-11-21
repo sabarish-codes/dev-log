@@ -3,6 +3,7 @@ import { LandingPage } from './pages/Landing';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
 import { LogsPage } from './pages/Logs';
+import { LogDetailPage } from './pages/LogDetail';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
       {
         path: '/logs',
         element: <LogsPage />,
+      },
+      {
+        path: '/logs/:id',
+        element: <LogDetailPage />,
       },
     ],
   },
