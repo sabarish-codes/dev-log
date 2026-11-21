@@ -344,3 +344,14 @@ export async function updateLog(
     };
   });
 }
+
+export async function deleteLog(userId: number, logId: number) {
+  const [deleted] = await db
+    .delete(logs)
+    .where(and(eq(logs.id, logId), eq(logs.userId, userId)))
+    .returning({ id: logs.id });
+  if (!deleted) {
+    throw new AppError('Log not found', 404);
+  }
+  return deleted;
+}

@@ -28,3 +28,8 @@ export const updateLog: RequestHandler = asyncHandler(async (req, res) => {
   );
   res.status(200).json({ data: { log } });
 });
+
+export const deleteLog: RequestHandler = asyncHandler(async (req, res) => {
+  await logService.deleteLog(req.user!.userId, Number(req.params.id));
+  res.status(200).json({ data: { message: 'Log deleted successfully' } });
+});
