@@ -219,6 +219,35 @@ export const openapiSpec = {
                 },
               },
             },
+            get: {
+              summary: 'List user logs',
+              tags: ['Logs'],
+              security: [{ bearerAuth: [] }],
+              responses: {
+                '200': {
+                  description: 'List of logs (newest first)',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        type: 'object',
+                        properties: {
+                          data: {
+                            type: 'object',
+                            properties: {
+                              logs: {
+                                type: 'array',
+                                items: { type: 'object' },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                '401': { description: 'Unauthorized' },
+              },
+            },
           },
         },
         responses: {
