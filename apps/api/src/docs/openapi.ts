@@ -163,6 +163,71 @@ export const openapiSpec = {
         },
       },
     },
+
+    '/api/v1/logs': {
+      post: {
+        summary: 'Create a log entry',
+        tags: ['Logs'],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: [
+                  'title',
+                  'type',
+                  'fixTakeaway',
+                  'date',
+                  'timespentMinutes',
+                ],
+                properties: {
+                  title: {
+                    type: 'string',
+                    example: 'Docker host.docker.internal connection failed',
+                  },
+                  type: {
+                    type: 'string',
+                    enum: ['bug', 'error', 'config', 'discovery'],
+                  },
+                  errorMsg: {
+                    type: 'string',
+                    example: 'ECONNREFUSED 127.0.0.1:5432',
+                  },
+                  whatHappened: {
+                    type: 'string',
+                    example: 'API failed to reach DB from inside container',
+                  },
+                  fixTakeaway: {
+                    type: 'string',
+                    example: 'Use host.docker.internal on Docker desktop',
+                  },
+                  link: { type: 'string', example: 'https://docs.docker.com' },
+                  date: {
+                    type: 'string',
+                    format: 'date',
+                    example: '2026-11-22',
+                  },
+                  timespentMinutes: { type: 'integer', example: 45 },
+                  project: { type: 'string', example: 'dev-log' },
+                  tags: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    example: ['docker', 'networking'],
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: 'Log created successfully' },
+          '400': { description: 'Validation failed' },
+          '401': { description: 'Unauthorized' },
+        },
+      },
+    },
   },
 
   components: {
