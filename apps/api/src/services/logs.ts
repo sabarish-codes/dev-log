@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../config/drizzle.js';
 import { logs, logsTags, projects, tags } from '../db/schema.js';
 
@@ -121,4 +121,35 @@ export async function createLog(userId: number, input: CreateLogInput) {
       tags: resultTags,
     };
   });
+}
+
+export async function getLogs(userId: number) {
+  return await db
+    .select({
+      id: logs.id,
+      userId: logs.userId,
+      projectId: logs.projectId,
+      project: projects.name,
+      title: logs.title,
+      type: logs.type,
+      errorMsg: logs.errorMsg,
+      whatHappened: logs.whatHappened,
+      fixTakeaway: logs.fixTakeaway,
+      link: logs.link,
+      date: logs.date,
+      timespentMinutes: logs.timespentMinutes,
+      createdAt: logs.createdAt,
+      updatedAt: logs.updatedAt,
+      tags: sql<string[]>`coalesce(
+        json_agg(distinct ${tags.name}) filter (where ${tags.name} is not null),
+        '[]'::json
+      )`,
+    })
+    .from(logs)
+    .leftJoin(projects, eq(logs.projectId, projects.id))
+    .leftJoin(logsTags, eq(logs.id, logsTags.logId))
+    .leftJoin(tags, eq(logsTags.tagId, tags.id))
+    .where(eq(logs.userId, userId))
+    .groupBy(logs.id, projects.name)
+    .orderBy(desc(logs.date), desc(logs.createdAt));
 }
