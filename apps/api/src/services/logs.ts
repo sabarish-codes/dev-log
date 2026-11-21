@@ -189,3 +189,158 @@ export async function getLogById(userId: number, logId: number) {
   }
   return log;
 }
+
+export interface UpdateLogInput {
+  title?: string;
+  type?: 'bug' | 'error' | 'config' | 'discovery';
+  errorMsg?: string | null;
+  whatHappened?: string | null;
+  fixTakeaway?: string;
+  link?: string | null;
+  date?: string;
+  timespentMinutes?: number;
+  project?: string | null;
+  tags?: string[];
+}
+export async function updateLog(
+  userId: number,
+  logId: number,
+  input: UpdateLogInput,
+) {
+  return await db.transaction(async (tx) => {
+    // 1. Check ownership
+    const [existing] = await tx
+      .select({ id: logs.id, projectId: logs.projectId })
+      .from(logs)
+      .where(and(eq(logs.id, logId), eq(logs.userId, userId)))
+      .limit(1);
+    if (!existing) {
+      throw new AppError('Log not found', 404);
+    }
+    // 2. Handle Project update
+    let projectId = existing.projectId;
+    let projectName: string | null = null;
+    if (input.project !== undefined) {
+      if (input.project && input.project.trim()) {
+        const cleanProject = input.project.trim();
+        const [p] = await tx
+          .select({ id: projects.id, name: projects.name })
+          .from(projects)
+          .where(
+            and(
+              eq(projects.userId, userId),
+              sql`lower(${projects.name}) = lower(${cleanProject})`,
+            ),
+          )
+          .limit(1);
+        if (p) {
+          projectId = p.id;
+          projectName = p.name;
+        } else {
+          const [newP] = await tx
+            .insert(projects)
+            .values({ userId, name: cleanProject })
+            .returning({ id: projects.id, name: projects.name });
+          projectId = newP.id;
+          projectName = newP.name;
+        }
+      } else {
+        projectId = null;
+        projectName = null;
+      }
+    } else if (projectId) {
+      const [p] = await tx
+        .select({ name: projects.name })
+        .from(projects)
+        .where(eq(projects.id, projectId))
+        .limit(1);
+      projectName = p?.name ?? null;
+    }
+    // 3. Update Log fields
+    const updateFields: Record<string, unknown> = {};
+    if (input.title !== undefined) updateFields.title = input.title.trim();
+    if (input.type !== undefined) updateFields.type = input.type;
+    if (input.errorMsg !== undefined)
+      updateFields.errorMsg = input.errorMsg?.trim() || null;
+    if (input.whatHappened !== undefined)
+      updateFields.whatHappened = input.whatHappened?.trim() || null;
+    if (input.fixTakeaway !== undefined)
+      updateFields.fixTakeaway = input.fixTakeaway.trim();
+    if (input.link !== undefined)
+      updateFields.link = input.link?.trim() || null;
+    if (input.date !== undefined) updateFields.date = input.date;
+    if (input.timespentMinutes !== undefined)
+      updateFields.timespentMinutes = input.timespentMinutes;
+    if (input.project !== undefined) updateFields.projectId = projectId;
+    let updatedLog;
+    if (Object.keys(updateFields).length > 0) {
+      const [res] = await tx
+        .update(logs)
+        .set(updateFields)
+        .where(and(eq(logs.id, logId), eq(logs.userId, userId)))
+        .returning();
+      updatedLog = res;
+    } else {
+      const [res] = await tx
+        .select()
+        .from(logs)
+        .where(and(eq(logs.id, logId), eq(logs.userId, userId)))
+        .limit(1);
+      updatedLog = res;
+    }
+    // 4. Replace Tags in the same transaction
+    let resultTags: string[] = [];
+    if (input.tags !== undefined) {
+      await tx
+        .delete(logsTags)
+        .where(and(eq(logsTags.logId, logId), eq(logsTags.userId, userId)));
+      const uniqueTagNames = Array.from(
+        new Map(
+          input.tags
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .map((t) => [t.toLowerCase(), t]),
+        ).values(),
+      );
+      for (const tagName of uniqueTagNames) {
+        const [existingTag] = await tx
+          .select({ id: tags.id, name: tags.name })
+          .from(tags)
+          .where(
+            and(
+              eq(tags.userId, userId),
+              sql`lower(${tags.name}) = lower(${tagName})`,
+            ),
+          )
+          .limit(1);
+        let tagId: number;
+        let finalTagName: string;
+        if (existingTag) {
+          tagId = existingTag.id;
+          finalTagName = existingTag.name;
+        } else {
+          const [newTag] = await tx
+            .insert(tags)
+            .values({ userId, name: tagName })
+            .returning({ id: tags.id, name: tags.name });
+          tagId = newTag.id;
+          finalTagName = newTag.name;
+        }
+        await tx.insert(logsTags).values({ logId, tagId, userId });
+        resultTags.push(finalTagName);
+      }
+    } else {
+      const existingTags = await tx
+        .select({ name: tags.name })
+        .from(logsTags)
+        .innerJoin(tags, eq(logsTags.tagId, tags.id))
+        .where(eq(logsTags.logId, logId));
+      resultTags = existingTags.map((t) => t.name);
+    }
+    return {
+      ...updatedLog,
+      project: projectName,
+      tags: resultTags,
+    };
+  });
+}

@@ -19,3 +19,12 @@ export const getLogById: RequestHandler = asyncHandler(async (req, res) => {
   );
   res.status(200).json({ data: { log } });
 });
+
+export const updateLog: RequestHandler = asyncHandler(async (req, res) => {
+  const log = await logService.updateLog(
+    req.user!.userId,
+    Number(req.params.id),
+    req.body,
+  );
+  res.status(200).json({ data: { log } });
+});

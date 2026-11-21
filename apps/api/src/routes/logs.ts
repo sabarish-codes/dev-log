@@ -38,3 +38,26 @@ logsRouter.get(
   validate({ params: logIdParamSchema }),
   logController.getLogById,
 );
+
+const updateLogSchema = z.object({
+  title: z.string().trim().min(1).max(256).optional(),
+  type: z.enum(['bug', 'error', 'config', 'discovery']).optional(),
+  errorMsg: z.string().trim().optional().nullable(),
+  whatHappened: z.string().trim().optional().nullable(),
+  fixTakeaway: z.string().trim().min(1).optional(),
+  link: z.string().trim().optional().nullable(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+    .optional(),
+  timespentMinutes: z.coerce.number().int().positive().optional(),
+  project: z.string().trim().optional().nullable(),
+  tags: z.array(z.string().trim().min(1)).optional(),
+});
+
+logsRouter.patch(
+  '/:id',
+  requireAuth,
+  validate({ params: logIdParamSchema, body: updateLogSchema }),
+  logController.updateLog,
+);
