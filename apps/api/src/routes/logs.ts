@@ -27,3 +27,14 @@ logsRouter.post(
 );
 
 logsRouter.get('/', requireAuth, logController.getLogs);
+
+const logIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+logsRouter.get(
+  '/:id',
+  requireAuth,
+  validate({ params: logIdParamSchema }),
+  logController.getLogById,
+);
