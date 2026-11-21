@@ -335,6 +335,43 @@ export const openapiSpec = {
         },
       },
     },
+    '/api/v1/stats': {
+      get: {
+        summary: 'Get user debugging statistics',
+        tags: ['Stats'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Total log count and debugging time',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'object',
+                      properties: {
+                        stats: {
+                          type: 'object',
+                          properties: {
+                            totalLogs: { type: 'integer', example: 12 },
+                            totalTimespentMinutes: {
+                              type: 'integer',
+                              example: 480,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '401': { description: 'Unauthorized' },
+        },
+      },
+    },
   },
 
   components: {
