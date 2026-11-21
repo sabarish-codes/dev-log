@@ -1,8 +1,9 @@
 import rateLimit from 'express-rate-limit';
+import { env } from '../config/env.js';
 
 export const rateLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  limit: 10,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: env.NODE_ENV === 'development' ? 1000 : 100,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
 });
