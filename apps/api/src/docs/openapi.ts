@@ -220,24 +220,84 @@ export const openapiSpec = {
               },
             },
             get: {
-              summary: 'List user logs',
+              summary:
+                'List user logs with search, filter, sort and pagination',
               tags: ['Logs'],
               security: [{ bearerAuth: [] }],
+              parameters: [
+                {
+                  name: 'q',
+                  in: 'query',
+                  schema: { type: 'string', maxLength: 100 },
+                  description: 'Search keywords',
+                },
+                {
+                  name: 'type',
+                  in: 'query',
+                  schema: {
+                    type: 'string',
+                    enum: ['bug', 'error', 'config', 'discovery'],
+                  },
+                },
+                {
+                  name: 'project',
+                  in: 'query',
+                  schema: { type: 'string' },
+                  description: 'Project name',
+                },
+                {
+                  name: 'tags',
+                  in: 'query',
+                  schema: { type: 'string' },
+                  description: 'Comma-separated tags (matches any)',
+                },
+                {
+                  name: 'from',
+                  in: 'query',
+                  schema: { type: 'string', format: 'date' },
+                  description: 'Start date (YYYY-MM-DD)',
+                },
+                {
+                  name: 'to',
+                  in: 'query',
+                  schema: { type: 'string', format: 'date' },
+                  description: 'End date (YYYY-MM-DD)',
+                },
+                {
+                  name: 'sort',
+                  in: 'query',
+                  schema: {
+                    type: 'string',
+                    enum: ['newest', 'oldest'],
+                    default: 'newest',
+                  },
+                },
+                {
+                  name: 'page',
+                  in: 'query',
+                  schema: { type: 'integer', default: 1 },
+                },
+                {
+                  name: 'limit',
+                  in: 'query',
+                  schema: { type: 'integer', default: 10, maximum: 50 },
+                },
+              ],
               responses: {
                 '200': {
-                  description: 'List of logs (newest first)',
+                  description: 'Paginated logs list',
                   content: {
                     'application/json': {
                       schema: {
                         type: 'object',
                         properties: {
-                          data: {
+                          data: { type: 'array', items: { type: 'object' } },
+                          meta: {
                             type: 'object',
                             properties: {
-                              logs: {
-                                type: 'array',
-                                items: { type: 'object' },
-                              },
+                              total: { type: 'integer' },
+                              page: { type: 'integer' },
+                              limit: { type: 'integer' },
                             },
                           },
                         },
@@ -245,6 +305,7 @@ export const openapiSpec = {
                     },
                   },
                 },
+                '400': { description: 'Bad query parameters' },
                 '401': { description: 'Unauthorized' },
               },
             },
