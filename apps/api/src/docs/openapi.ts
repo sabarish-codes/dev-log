@@ -433,6 +433,73 @@ export const openapiSpec = {
         },
       },
     },
+    '/api/v1/projects': {
+      get: {
+        summary: "Get user's projects",
+        tags: ['Projects'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Alphabetical list of projects',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'integer' },
+                          name: { type: 'string', example: 'dev-log' },
+                          createdAt: { type: 'string', format: 'date-time' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '401': { description: 'Unauthorized' },
+        },
+      },
+    },
+
+    '/api/v1/tags': {
+      get: {
+        summary: "Get user's tags",
+        tags: ['Tags'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Alphabetical list of tags',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'integer' },
+                          name: { type: 'string', example: 'docker' },
+                          createdAt: { type: 'string', format: 'date-time' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '401': { description: 'Unauthorized' },
+        },
+      },
+    },
   },
 
   components: {
