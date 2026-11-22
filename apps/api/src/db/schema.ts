@@ -4,6 +4,7 @@ import {
   check,
   date,
   foreignKey,
+  index,
   integer,
   text,
   primaryKey,
@@ -130,6 +131,8 @@ export const logs = pgTable(
       .$onUpdate(() => new Date()), // Requirement 2: Drizzle auto-update hook
   },
   (table) => [
+    index('logs_user_id_idx').on(table.userId),
+    index('logs_project_id_idx').on(table.projectId),
     unique('logs_id_user_id_uq').on(table.id, table.userId),
     foreignKey({
       columns: [table.projectId, table.userId],
@@ -158,6 +161,7 @@ export const logsTags = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.logId, table.tagId] }),
+    index('logs_tags_tag_id_idx').on(table.tagId),
     foreignKey({
       columns: [table.logId, table.userId],
       foreignColumns: [logs.id, logs.userId],
