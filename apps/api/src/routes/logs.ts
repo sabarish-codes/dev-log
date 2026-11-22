@@ -26,7 +26,38 @@ logsRouter.post(
   logController.createLog,
 );
 
-logsRouter.get('/', requireAuth, logController.getLogs);
+const getLogsQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  type: z.enum(['bug', 'error', 'config', 'discovery']).optional(),
+  project: z.string().trim().max(128).optional(),
+  tags: z
+    .string()
+    .transform((val) =>
+      val
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
+    )
+    .optional(),
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD')
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD')
+    .optional(),
+  sort: z.enum(['newest', 'oldest']).default('newest'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+
+logsRouter.get(
+  '/',
+  requireAuth,
+  validate({ query: getLogsQuerySchema }),
+  logController.getLogs,
+);
 
 const logIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
