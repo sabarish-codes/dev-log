@@ -16,6 +16,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
 import { logsRouter } from './routes/logs.js';
 import { statsRouter } from './routes/stats.js';
+import { projectsRouter } from './routes/projects.js';
 
 export function createApp(): Application {
   const app = express();
@@ -45,6 +46,7 @@ export function createApp(): Application {
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/logs', logsRouter);
   app.use('/api/v1/stats', statsRouter);
+  app.use('/api/v1/projects', projectsRouter);
 
   app.use(notFound);
 
