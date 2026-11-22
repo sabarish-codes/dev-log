@@ -9,7 +9,7 @@ const DEMO_EMAIL = 'demo@devlog.io';
 const DEMO_PASSWORD = 'Password123!';
 
 const SEED_LOGS = [
-  // 1. Config
+  // August 2026
   {
     title: 'Docker container cannot reach PostgreSQL on localhost',
     type: 'config' as const,
@@ -20,10 +20,9 @@ const SEED_LOGS = [
       'In Docker for Mac/Windows, use host.docker.internal:5432 instead of localhost:5432.',
     project: 'dev-log',
     tags: ['docker', 'networking', 'postgres'],
-    date: '2026-11-01',
+    date: '2026-08-14',
     timespentMinutes: 45,
   },
-  // 2. Error
   {
     title:
       'PostgreSQL check constraint fails on table-prefixed columns in CREATE TABLE',
@@ -35,24 +34,23 @@ const SEED_LOGS = [
       'In PostgreSQL CREATE TABLE check constraints, columns must be unqualified: CHECK (username != "").',
     project: 'dev-log',
     tags: ['postgres', 'sql', 'drizzle'],
-    date: '2026-11-02',
+    date: '2026-08-20',
     timespentMinutes: 60,
   },
-  // 3. Bug
   {
-    title: 'Refresh token cookie not sent across Vite and Express ports',
+    title: 'Idempotency key duplicate race condition in Stripe webhook handler',
     type: 'bug' as const,
-    errorMsg: '401 Unauthorized on /api/v1/auth/refresh',
+    errorMsg:
+      'duplicate key value violates unique constraint "payments_idempotency_uq"',
     whatHappened:
-      'Cookie was set in browser but request to /refresh never had Cookie header attached',
+      'Two concurrent webhook deliveries for charge.succeeded attempted simultaneous database writes',
     fixTakeaway:
-      'Axios requires withCredentials: true, and CORS must specify exact origin with credentials: true.',
-    project: 'auth-service',
-    tags: ['cookies', 'cors', 'axios', 'express'],
-    date: '2026-11-03',
+      'Use INSERT ... ON CONFLICT DO NOTHING with Redis distributed locking for concurrent webhooks.',
+    project: 'payment-gateway',
+    tags: ['postgres', 'redis', 'stripe'],
+    date: '2026-08-27',
     timespentMinutes: 90,
   },
-  // 4. Discovery
   {
     title: 'PostgreSQL generatedAlwaysAsIdentity vs serial',
     type: 'discovery' as const,
@@ -62,10 +60,24 @@ const SEED_LOGS = [
       'GENERATED ALWAYS AS IDENTITY is SQL standard and prevents accidental manual ID inserts unlike serial.',
     project: 'dev-log',
     tags: ['postgres', 'sql'],
-    date: '2026-11-04',
+    date: '2026-08-30',
     timespentMinutes: 30,
   },
-  // 5. Error
+  {
+    title: 'Kafka consumer group rebalance storm on consumer lag spikes',
+    type: 'error' as const,
+    errorMsg:
+      'CommitFailedException: The commit failed since the group has already rebalanced',
+    whatHappened:
+      'Heavy analytical batch processing exceeded max.poll.interval.ms threshold',
+    fixTakeaway:
+      'Increase max.poll.interval.ms or offload intensive row transformations to worker threads.',
+    project: 'analytics-pipeline',
+    tags: ['kafka', 'streaming', 'devops'],
+    date: '2026-09-05',
+    timespentMinutes: 110,
+  },
+  // September 2026
   {
     title: 'TypeError: Do not know how to serialize a BigInt',
     type: 'error' as const,
@@ -77,10 +89,9 @@ const SEED_LOGS = [
       'In Drizzle pg-core, use bigint({ mode: "number" }) for IDs under 9 quadrillion to serialize directly.',
     project: 'dev-log',
     tags: ['typescript', 'drizzle', 'express'],
-    date: '2026-11-05',
+    date: '2026-09-12',
     timespentMinutes: 40,
   },
-  // 6. Config
   {
     title: 'Nginx 502 Bad Gateway with upstream Express container',
     type: 'config' as const,
@@ -91,10 +102,9 @@ const SEED_LOGS = [
       'Ensure Nginx and API share the same Docker network and proxy_pass uses the service name http://api:3000.',
     project: 'dev-log',
     tags: ['nginx', 'docker', 'devops'],
-    date: '2026-11-06',
+    date: '2026-09-18',
     timespentMinutes: 75,
   },
-  // 7. Bug
   {
     title: 'Stale state in React useEffect closure',
     type: 'bug' as const,
@@ -104,10 +114,9 @@ const SEED_LOGS = [
       'Use functional state updates setLogs(prev => ...) or useRef to avoid capturing stale values in closures.',
     project: 'dev-log',
     tags: ['react', 'hooks', 'javascript'],
-    date: '2026-11-07',
+    date: '2026-09-24',
     timespentMinutes: 50,
   },
-  // 8. Discovery
   {
     title: 'pnpm deploy for minimal Docker images',
     type: 'discovery' as const,
@@ -117,10 +126,23 @@ const SEED_LOGS = [
       'pnpm --filter api deploy --prod /out isolates only the needed package and its production dependencies (200MB).',
     project: 'dev-log',
     tags: ['pnpm', 'docker', 'monorepo'],
-    date: '2026-11-08',
+    date: '2026-09-29',
     timespentMinutes: 60,
   },
-  // 9. Error
+  {
+    title: 'ClickHouse batch insertion memory spikes on uncompressed payloads',
+    type: 'config' as const,
+    errorMsg: 'DB::Exception: Memory limit (for query) exceeded',
+    whatHappened:
+      'Flushing 200,000 raw metric events at once exceeded query buffer thresholds',
+    fixTakeaway:
+      'Compress bulk inserts with gzip and chunk stream flushes every 10,000 rows or 5 seconds.',
+    project: 'analytics-pipeline',
+    tags: ['clickhouse', 'databases', 'performance'],
+    date: '2026-10-04',
+    timespentMinutes: 65,
+  },
+  // October 2026
   {
     title: 'Jest crashes on pure ESM dependency jose',
     type: 'error' as const,
@@ -129,12 +151,11 @@ const SEED_LOGS = [
       'Running unit test on auth service failed because Jest defaults to CommonJS require()',
     fixTakeaway:
       'Set transformIgnorePatterns: [] in jest.config and pass --experimental-vm-modules to node.',
-    project: 'dev-log',
+    project: 'auth-service',
     tags: ['jest', 'esm', 'testing'],
-    date: '2026-11-09',
+    date: '2026-10-10',
     timespentMinutes: 80,
   },
-  // 10. Config
   {
     title: 'Tailwind v4 theme variables not resolving in Shadcn UI',
     type: 'config' as const,
@@ -145,10 +166,9 @@ const SEED_LOGS = [
       'Tailwind v4 replaces tailwind.config.js with @theme directive in index.css; map variables directly.',
     project: 'dev-log',
     tags: ['tailwind', 'css', 'vite'],
-    date: '2026-11-10',
+    date: '2026-10-15',
     timespentMinutes: 45,
   },
-  // 11. Bug
   {
     title: 'Redis client closed error on API server reload',
     type: 'bug' as const,
@@ -158,10 +178,9 @@ const SEED_LOGS = [
       'Handle redis reconnect events and graceful shutdown with server.close() and redis.quit().',
     project: 'auth-service',
     tags: ['redis', 'node', 'express'],
-    date: '2026-11-11',
+    date: '2026-10-22',
     timespentMinutes: 60,
   },
-  // 12. Discovery
   {
     title: 'Zod flattenError vs format for form errors',
     type: 'discovery' as const,
@@ -171,10 +190,25 @@ const SEED_LOGS = [
       'z.flattenError(error).fieldErrors returns Record<string, string[]> which directly maps to form input error states.',
     project: 'dev-log',
     tags: ['zod', 'typescript', 'validation'],
-    date: '2026-11-12',
+    date: '2026-10-28',
     timespentMinutes: 25,
   },
-  // 13. Error
+  {
+    title:
+      'Stripe webhook signature verification failure on body-parser raw body loss',
+    type: 'error' as const,
+    errorMsg:
+      'Webhook Error: No signatures found matching the expected signature for payload',
+    whatHappened:
+      'express.json() parsed the JSON body prior to Stripe constructEvent signature verification',
+    fixTakeaway:
+      'Pass express.raw({ type: "application/json" }) strictly to the Stripe webhook route before JSON parser.',
+    project: 'payment-gateway',
+    tags: ['stripe', 'security', 'express'],
+    date: '2026-11-03',
+    timespentMinutes: 70,
+  },
+  // November 2026
   {
     title:
       'CORS header Access-Control-Allow-Origin cannot be wildcard when credentials is true',
@@ -187,10 +221,9 @@ const SEED_LOGS = [
       'When sending cookies/credentials, Access-Control-Allow-Origin must be an explicit URL matching client.',
     project: 'auth-service',
     tags: ['cors', 'security', 'express'],
-    date: '2026-11-13',
+    date: '2026-11-08',
     timespentMinutes: 35,
   },
-  // 14. Bug
   {
     title: 'Duplicate tags created due to casing differences',
     type: 'bug' as const,
@@ -200,10 +233,9 @@ const SEED_LOGS = [
       'Use uniqueIndex("tags_user_name_uq").on(userId, sql`lower(name)`) and lower() before insert.',
     project: 'dev-log',
     tags: ['postgres', 'database', 'drizzle'],
-    date: '2026-11-14',
+    date: '2026-11-12',
     timespentMinutes: 40,
   },
-  // 15. Config
   {
     title: 'Prometheus scraper failed to reach API target',
     type: 'config' as const,
@@ -215,10 +247,9 @@ const SEED_LOGS = [
       'In prometheus.yml static_configs, use host.docker.internal:3000 or container name api:3000.',
     project: 'dev-log',
     tags: ['prometheus', 'monitoring', 'docker'],
-    date: '2026-11-15',
+    date: '2026-11-16',
     timespentMinutes: 30,
   },
-  // 16. Discovery
   {
     title: 'Argon2id vs bcrypt performance and security',
     type: 'discovery' as const,
@@ -227,51 +258,9 @@ const SEED_LOGS = [
       'Argon2id is memory-hard and GPU-resistant, making brute force far costlier than bcrypt for the same CPU time.',
     project: 'auth-service',
     tags: ['security', 'cryptography', 'auth'],
-    date: '2026-11-16',
+    date: '2026-11-19',
     timespentMinutes: 45,
   },
-  // 17. Error
-  {
-    title: 'JWT TokenExpiredError not caught by auth middleware',
-    type: 'error' as const,
-    errorMsg: 'JWTExpired: "exp" claim timestamp check failed',
-    whatHappened:
-      'Expired tokens caused unhandled 500 error instead of clean 401 response',
-    fixTakeaway:
-      'Wrap jwtVerify in try/catch and map jose errors to AppError("Invalid or expired token", 401).',
-    project: 'auth-service',
-    tags: ['jwt', 'auth', 'node'],
-    date: '2026-11-17',
-    timespentMinutes: 30,
-  },
-  // 18. Bug
-  {
-    title: 'Turborepo cache miss on identical builds',
-    type: 'bug' as const,
-    whatHappened:
-      'turbo build was rebuilding api package every time despite no code changes',
-    fixTakeaway:
-      'Add outputs: ["dist/**"] in turbo.json so turbo tracks compiled artifacts in its hash.',
-    project: 'dev-log',
-    tags: ['turborepo', 'monorepo', 'build'],
-    date: '2026-11-18',
-    timespentMinutes: 55,
-  },
-  // 19. Config
-  {
-    title: 'PostgreSQL container port conflict on 5432 with Windows service',
-    type: 'config' as const,
-    errorMsg: 'password authentication failed for user "postgres"',
-    whatHappened:
-      'Local Windows PostgreSQL service was intercepting connections intended for Docker',
-    fixTakeaway:
-      'Map Docker host port to 5433:5432 in docker-compose.yml to avoid host service collisions.',
-    project: 'dev-log',
-    tags: ['docker', 'postgres', 'windows'],
-    date: '2026-11-19',
-    timespentMinutes: 50,
-  },
-  // 20. Discovery
   {
     title:
       'Single-source-of-truth types with Drizzle $inferSelect and $inferInsert',
@@ -282,7 +271,7 @@ const SEED_LOGS = [
       'Export typeof table.$inferSelect and $inferInsert directly from schema to eliminate duplicate interfaces.',
     project: 'dev-log',
     tags: ['typescript', 'drizzle', 'database'],
-    date: '2026-11-20',
+    date: '2026-11-22',
     timespentMinutes: 20,
   },
 ];
