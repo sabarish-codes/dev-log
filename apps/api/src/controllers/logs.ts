@@ -8,8 +8,11 @@ export const createLog: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const getLogs: RequestHandler = asyncHandler(async (req, res) => {
-  const logs = await logService.getLogs(req.user!.userId);
-  res.status(200).json({ data: { logs } });
+  const result = await logService.getLogs(
+    req.user!.userId,
+    req.query as unknown as logService.GetLogsParams,
+  );
+  res.status(200).json(result);
 });
 
 export const getLogById: RequestHandler = asyncHandler(async (req, res) => {

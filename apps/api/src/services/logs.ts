@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { db } from '../config/drizzle.js';
 import { logs, logsTags, projects, tags } from '../db/schema.js';
 import { AppError } from '../errors/AppError.js';
@@ -124,35 +124,143 @@ export async function createLog(userId: number, input: CreateLogInput) {
   });
 }
 
-export async function getLogs(userId: number) {
-  return await db
-    .select({
-      id: logs.id,
-      userId: logs.userId,
-      projectId: logs.projectId,
-      project: projects.name,
-      title: logs.title,
-      type: logs.type,
-      errorMsg: logs.errorMsg,
-      whatHappened: logs.whatHappened,
-      fixTakeaway: logs.fixTakeaway,
-      link: logs.link,
-      date: logs.date,
-      timespentMinutes: logs.timespentMinutes,
-      createdAt: logs.createdAt,
-      updatedAt: logs.updatedAt,
-      tags: sql<string[]>`coalesce(
-        json_agg(distinct ${tags.name}) filter (where ${tags.name} is not null),
-        '[]'::json
+export interface GetLogsParams {
+  q?: string;
+  type?: 'bug' | 'error' | 'config' | 'discovery';
+  project?: string;
+  tags?: string[];
+  from?: string;
+  to?: string;
+  sort?: 'newest' | 'oldest';
+  page?: number;
+  limit?: number;
+}
+
+function escapeLike(str: string): string {
+  return str.replace(/[%_\\]/g, '\\$&');
+}
+
+export async function getLogs(userId: number, params: GetLogsParams) {
+  const conditions = [eq(logs.userId, userId)];
+  // 1. Search (q): every word must match in title, errorMsg, whatHappened, or fixTakeaway
+  if (params.q && params.q.trim()) {
+    const words = params.q.trim().split(/\s+/).filter(Boolean);
+    for (const word of words) {
+      const pattern = `%${escapeLike(word)}%`;
+      conditions.push(
+        sql`(${logs.title} ilike ${pattern} or ${logs.errorMsg} ilike ${pattern} or ${logs.whatHappened} ilike ${pattern} or ${logs.fixTakeaway} ilike ${pattern})`,
+      );
+    }
+  }
+  // 2. Filters
+  if (params.type) {
+    conditions.push(eq(logs.type, params.type));
+  }
+  if (params.project && params.project.trim()) {
+    const cleanProject = params.project.trim();
+    conditions.push(
+      sql`exists (
+        select 1 from ${projects}
+        where ${projects.id} = ${logs.projectId}
+          and lower(${projects.name}) = lower(${cleanProject})
       )`,
+    );
+  }
+  if (params.tags && params.tags.length > 0) {
+    const lowerTags = params.tags
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    if (lowerTags.length > 0) {
+      conditions.push(
+        sql`exists (
+          select 1 from ${logsTags}
+          inner join ${tags} on ${logsTags.tagId} = ${tags.id}
+          where ${logsTags.logId} = ${logs.id}
+            and lower(${tags.name}) in (${sql.join(
+              lowerTags.map((t) => sql`${t}`),
+              sql`, `,
+            )})
+        )`,
+      );
+    }
+  }
+  if (params.from) {
+    conditions.push(gte(logs.date, params.from));
+  }
+  if (params.to) {
+    conditions.push(lte(logs.date, params.to));
+  }
+  const whereClause = and(...conditions);
+  // 3. Sort (newest vs oldest with id as stable tiebreaker)
+  const isOldest = params.sort === 'oldest';
+  const orderBy = isOldest
+    ? [asc(logs.date), asc(logs.id)]
+    : [desc(logs.date), desc(logs.id)];
+  // 4. Pagination
+  const page = Math.max(1, params.page || 1);
+  const limit = Math.min(50, Math.max(1, params.limit || 10));
+  const offset = (page - 1) * limit;
+  // Run COUNT and List query
+  const [[countResult], rows] = await Promise.all([
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(logs)
+      .where(whereClause),
+    db
+      .select({
+        id: logs.id,
+        userId: logs.userId,
+        projectId: logs.projectId,
+        project: projects.name,
+        title: logs.title,
+        type: logs.type,
+        errorMsg: logs.errorMsg,
+        whatHappened: logs.whatHappened,
+        fixTakeaway: logs.fixTakeaway,
+        link: logs.link,
+        date: logs.date,
+        timespentMinutes: logs.timespentMinutes,
+        createdAt: logs.createdAt,
+        updatedAt: logs.updatedAt,
+      })
+      .from(logs)
+      .leftJoin(projects, eq(logs.projectId, projects.id))
+      .where(whereClause)
+      .orderBy(...orderBy)
+      .limit(limit)
+      .offset(offset),
+  ]);
+  const total = countResult?.total ?? 0;
+  if (rows.length === 0) {
+    return {
+      data: [],
+      meta: { total, page, limit },
+    };
+  }
+  // 5. Batch-fetch tags for the page in 1 single query
+  const logIds = rows.map((r) => r.id);
+  const tagRows = await db
+    .select({
+      logId: logsTags.logId,
+      tagName: tags.name,
     })
-    .from(logs)
-    .leftJoin(projects, eq(logs.projectId, projects.id))
-    .leftJoin(logsTags, eq(logs.id, logsTags.logId))
-    .leftJoin(tags, eq(logsTags.tagId, tags.id))
-    .where(eq(logs.userId, userId))
-    .groupBy(logs.id, projects.name)
-    .orderBy(desc(logs.date), desc(logs.createdAt));
+    .from(logsTags)
+    .innerJoin(tags, eq(logsTags.tagId, tags.id))
+    .where(inArray(logsTags.logId, logIds));
+  const tagsByLogId = new Map<number, string[]>();
+  for (const tr of tagRows) {
+    const list = tagsByLogId.get(tr.logId) || [];
+    list.push(tr.tagName);
+    tagsByLogId.set(tr.logId, list);
+  }
+  const logsWithTags = rows.map((r) => ({
+    ...r,
+    tags: tagsByLogId.get(r.id) || [],
+  }));
+  return {
+    data: logsWithTags,
+    meta: { total, page, limit },
+  };
 }
 
 export async function getLogById(userId: number, logId: number) {
