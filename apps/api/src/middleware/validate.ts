@@ -27,7 +27,12 @@ export function validate(schemas: ValidationSchemas): RequestHandler {
       if (!result.success) {
         errors.query = z.flattenError(result.error).fieldErrors;
       } else {
-        req.query = result.data as Request['query'];
+        Object.defineProperty(req, 'query', {
+          value: result.data,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
       }
     }
 
