@@ -38,9 +38,46 @@ export interface Stats {
   totalTimespentMinutes: number;
 }
 
-export async function getLogsApi(): Promise<LogItem[]> {
-  const { data } = await api.get<{ data: { logs: LogItem[] } }>('/api/v1/logs');
-  return data.data.logs;
+export interface GetLogsQueryParams {
+  q?: string;
+  type?: LogType;
+  project?: string;
+  tags?: string; // Comma-separated list e.g. "docker,postgres"
+  from?: string; // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
+  sort?: 'newest' | 'oldest';
+  page?: number;
+  limit?: number;
+}
+
+export interface LogsResponse {
+  data: LogItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
+
+export interface ProjectItem {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
+export interface TagItem {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
+export async function getLogsApi(
+  params?: GetLogsQueryParams,
+): Promise<LogsResponse> {
+  const { data } = await api.get<LogsResponse>('/api/v1/logs', {
+    params,
+  });
+  return data;
 }
 
 export async function getLogByIdApi(id: number): Promise<LogItem> {
@@ -76,4 +113,14 @@ export async function deleteLogApi(id: number): Promise<void> {
 export async function getStatsApi(): Promise<Stats> {
   const { data } = await api.get<{ data: { stats: Stats } }>('/api/v1/stats');
   return data.data.stats;
+}
+
+export async function getProjectsApi(): Promise<ProjectItem[]> {
+  const { data } = await api.get<{ data: ProjectItem[] }>('/api/v1/projects');
+  return data.data;
+}
+
+export async function getTagsApi(): Promise<TagItem[]> {
+  const { data } = await api.get<{ data: TagItem[] }>('/api/v1/tags');
+  return data.data;
 }
