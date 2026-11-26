@@ -69,14 +69,7 @@ export async function createLog(userId: number, input: CreateLogInput) {
     const resultTags: string[] = [];
     if (input.tags && input.tags.length > 0) {
       // Deduplicate tags case-insensitively
-      const uniqueTagNames = Array.from(
-        new Map(
-          input.tags
-            .map((t) => t.trim())
-            .filter(Boolean)
-            .map((t) => [t.toLowerCase(), t]),
-        ).values(),
-      );
+      const uniqueTagNames = normalizeTagNames(input.tags);
 
       for (const tagName of uniqueTagNames) {
         const [existingTag] = await tx
@@ -136,15 +129,30 @@ export interface GetLogsParams {
   limit?: number;
 }
 
-function escapeLike(str: string): string {
+export function escapeLike(str: string): string {
   return str.replace(/[%_\\]/g, '\\$&');
+}
+
+export function parseSearchWords(q?: string): string[] {
+  if (!q || !q.trim()) return [];
+  return q.trim().split(/\s+/).filter(Boolean);
+}
+export function normalizeTagNames(rawTags: string[]): string[] {
+  return Array.from(
+    new Map(
+      rawTags
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .map((t) => [t.toLowerCase(), t]),
+    ).values(),
+  );
 }
 
 export async function getLogs(userId: number, params: GetLogsParams) {
   const conditions = [eq(logs.userId, userId)];
   // 1. Search (q): every word must match in title, errorMsg, whatHappened, or fixTakeaway
   if (params.q && params.q.trim()) {
-    const words = params.q.trim().split(/\s+/).filter(Boolean);
+    const words = parseSearchWords(params.q);
     for (const word of words) {
       const pattern = `%${escapeLike(word)}%`;
       conditions.push(
@@ -402,14 +410,7 @@ export async function updateLog(
       await tx
         .delete(logsTags)
         .where(and(eq(logsTags.logId, logId), eq(logsTags.userId, userId)));
-      const uniqueTagNames = Array.from(
-        new Map(
-          input.tags
-            .map((t) => t.trim())
-            .filter(Boolean)
-            .map((t) => [t.toLowerCase(), t]),
-        ).values(),
-      );
+      const uniqueTagNames = normalizeTagNames(input.tags);
       for (const tagName of uniqueTagNames) {
         const [existingTag] = await tx
           .select({ id: tags.id, name: tags.name })
