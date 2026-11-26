@@ -26,27 +26,32 @@ logsRouter.post(
   logController.createLog,
 );
 
-const getLogsQuerySchema = z.object({
-  q: z.string().trim().max(100).optional(),
-  type: z.enum(['bug', 'error', 'config', 'discovery']).optional(),
-  project: z.string().trim().max(128).optional(),
+const emptyToUndefined = (schema: z.ZodTypeAny) =>
+  z.preprocess((val) => (val === '' ? undefined : val), schema.optional());
+export const getLogsQuerySchema = z.object({
+  q: emptyToUndefined(z.string().trim().max(100)),
+  type: emptyToUndefined(z.enum(['bug', 'error', 'config', 'discovery'])),
+  project: emptyToUndefined(z.string().trim().max(128)),
   tags: z
-    .string()
-    .transform((val) =>
-      val
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean),
+    .preprocess(
+      (val) => (val === '' ? undefined : val),
+      z
+        .string()
+        .transform((val) =>
+          val
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+        )
+        .optional(),
     )
     .optional(),
-  from: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD')
-    .optional(),
-  to: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD')
-    .optional(),
+  from: emptyToUndefined(
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD'),
+  ),
+  to: emptyToUndefined(
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD'),
+  ),
   sort: z.enum(['newest', 'oldest']).default('newest'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(10),
