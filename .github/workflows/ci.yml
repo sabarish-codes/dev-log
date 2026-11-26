@@ -4,12 +4,36 @@ on:
   push:
     branches:
       - main
-
   pull_request:
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: devlog_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -34,7 +58,19 @@ jobs:
         run: pnpm exec turbo run typecheck
 
       - name: Prepare test environment
-        run: cp apps/api/.env.example apps/api/.env
+        run: |
+          cp apps/api/.env.example apps/api/.env
+          cat << 'EOF' > apps/api/.env.test
+          NODE_ENV=test
+          PORT=3001
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/devlog_test
+          REDIS_URL=redis://localhost:6379
+          LOG_LEVEL=fatal
+          CORS_ORIGIN=http://localhost:5173
+          JWT_ACCESS_SECRET=ci-test-secret-key-at-least-32-chars-long
+          JWT_ACCESS_EXPIRES_IN=15m
+          REFRESH_TOKEN_TTL_DAYS=7
+          EOF
 
       - name: Test
         run: pnpm exec turbo run test
